@@ -71,6 +71,11 @@ class SimulationRun extends Model
         return $this->hasMany(BenchmarkResult::class);
     }
 
+    public function tickRequests(): HasMany
+    {
+        return $this->hasMany(SimulationTickRequest::class);
+    }
+
     public function scopeRunning(Builder $query): Builder
     {
         return $query->where('status', ShiftStatus::RUNNING->value);

@@ -3,11 +3,17 @@
 return [
     'simulation' => [
         'duration_min' => 120,
+        'default_start_at' => '2026-09-12T18:00:00-06:00',
         'real_seconds_per_sim_minute' => 1,
         'speed_multiplier' => (float) env('SIMULATION_SPEED_MULTIPLIER', 1),
         'max_concurrent_orders' => (int) env('MAX_CONCURRENT_ORDERS', 2),
         'planning_horizon_min' => 45,
         'cost_per_km_mxn' => (float) env('DEFAULT_COST_PER_KM_MXN', 1.25),
+        'vehicle' => env('SIMULATION_VEHICLE', 'motorcycle'),
+        'initial_position' => [
+            'lat' => (float) env('SIMULATION_INITIAL_LAT', 25.675),
+            'lon' => (float) env('SIMULATION_INITIAL_LON', -100.310),
+        ],
         'timezone' => env('SIMULATION_TIMEZONE', 'America/Monterrey'),
     ],
 
