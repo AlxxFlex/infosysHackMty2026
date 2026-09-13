@@ -31,6 +31,11 @@ return [
             'medium' => 55.0,
         ],
         'safe_slack_min' => 10,
+        'weather_factors' => [
+            'clear' => 1.0,
+            'rain' => 1.15,
+            'storm' => 1.35,
+        ],
     ],
 
     'optimization' => [
@@ -38,6 +43,10 @@ return [
         'max_candidate_set_size' => 2,
         'batch_size' => 2,
         'time_budget_ms' => 300,
+        'batch_efficiency_per_min_mxn' => 0.50,
+        'delay_cost_per_min_mxn' => 2.00,
+        'risk_penalty_mxn' => 10.00,
+        'idle_penalty_per_min_mxn' => 0.05,
     ],
 
     'routing' => [
@@ -50,7 +59,9 @@ return [
         'cache_ttl_seconds' => (int) env('OSRM_CACHE_TTL_SECONDS', 120),
         'cache_ttl_simulated_minutes' => 60,
         'road_factor' => (float) env('ROAD_FACTOR', 1.25),
+        'fallback_speed_kmh' => (float) env('FALLBACK_SPEED_KMH', 30),
         'traffic_bucket_size' => 0.10,
+        'algorithm_version' => env('ROUTING_ALGORITHM_VERSION', env('COURIER_ALGORITHM_VERSION', 'v1')),
     ],
 
     'demand' => [
@@ -59,7 +70,12 @@ return [
 
     'explanation' => [
         'provider' => env('LLM_PROVIDER', 'none'),
+        'endpoint' => env('LLM_ENDPOINT'),
+        'api_key' => env('LLM_API_KEY'),
+        'model' => env('LLM_MODEL', 'gpt-4o-mini'),
         'timeout_seconds' => (int) env('LLM_TIMEOUT_SECONDS', 5),
+        'retries' => (int) env('LLM_RETRIES', 1),
+        'retry_sleep_ms' => (int) env('LLM_RETRY_SLEEP_MS', 100),
         'max_tokens' => (int) env('LLM_MAX_TOKENS', 180),
     ],
 
@@ -67,5 +83,10 @@ return [
         'default_seeds' => [1, 2, 3],
         'default_count' => 3,
         'algorithm_version' => env('COURIER_ALGORITHM_VERSION', 'v1'),
+        'tick_minutes' => (int) env('BENCHMARK_TICK_MINUTES', 5),
+    ],
+
+    'demo' => [
+        'access_token' => env('DEMO_ACCESS_TOKEN'),
     ],
 ];

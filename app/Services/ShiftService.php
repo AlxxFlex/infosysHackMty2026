@@ -10,6 +10,7 @@ use App\DTOs\EnvironmentState;
 use App\Enums\AgentType;
 use App\Enums\CourierStatus;
 use App\Enums\ShiftStatus;
+use App\Events\SimulationUpdated;
 use App\Exceptions\InvalidSimulationTransition;
 use App\Models\Shift;
 use App\Models\SimulationRun;
@@ -21,7 +22,10 @@ use Illuminate\Support\Facades\DB;
 
 final class ShiftService
 {
-    public function __construct(private readonly StateMapper $stateMapper) {}
+    public function __construct(
+        private readonly StateMapper $stateMapper,
+        private readonly ScenarioService $scenarioService,
+    ) {}
 
     public function createRun(
         string $scenarioKey,
@@ -37,11 +41,13 @@ final class ShiftService
             throw new InvalidSimulationTransition('Seed cannot be negative.');
         }
 
+        // Validate and fully resolve the scenario before opening the write transaction.
+        $scenario = $this->scenarioService->load($scenarioKey, $seed);
         $configSnapshot ??= config('courier');
         $start = $simulatedStartedAt === null
             ? CarbonImmutable::parse((string) config('courier.simulation.default_start_at'))
             : CarbonImmutable::createFromInterface($simulatedStartedAt);
-        $duration = (int) config('courier.simulation.duration_min', 120);
+        $duration = (int) $scenario['duration_min'];
         $speedMultiplier = (float) config('courier.simulation.speed_multiplier', 1);
         $maxConcurrentOrders = (int) config('courier.simulation.max_concurrent_orders', 2);
         $costPerKmMxn = (float) config('courier.simulation.cost_per_km_mxn', 1.25);
@@ -50,13 +56,13 @@ final class ShiftService
             throw new InvalidSimulationTransition('Simulation configuration contains invalid limits.');
         }
 
-        $position = config('courier.simulation.initial_position', [
+        $position = $scenario['initial_position'] ?? config('courier.simulation.initial_position', [
             'lat' => 25.675,
             'lon' => -100.310,
         ]);
         $coordinates = Coordinates::fromArray($position);
 
-        return DB::transaction(function () use ($scenarioKey, $seed, $start, $duration, $speedMultiplier, $maxConcurrentOrders, $costPerKmMxn, $coordinates, $configSnapshot): SimulationRun {
+        return DB::transaction(function () use ($scenarioKey, $seed, $start, $duration, $speedMultiplier, $maxConcurrentOrders, $costPerKmMxn, $coordinates, $configSnapshot, $scenario): SimulationRun {
             $run = SimulationRun::query()->create([
                 'scenario_key' => $scenarioKey,
                 'seed' => $seed,
@@ -90,7 +96,9 @@ final class ShiftService
                 ]);
             }
 
-            return $run->load('shifts');
+            $this->scenarioService->materialize($run, $scenario);
+
+            return $run->load(['shifts', 'orders', 'events']);
         });
     }
 
@@ -125,6 +133,7 @@ final class ShiftService
                 'real_finished_at' => now(),
             ])->save();
             $this->setShiftStatus($lockedRun, ShiftStatus::FINISHED);
+            DB::afterCommit(fn () => SimulationUpdated::dispatch($lockedRun->id, 'run.finished', $lockedRun->simulated_current_at->toIso8601String(), [(string) $lockedRun->id], ['status' => ShiftStatus::FINISHED->value]));
 
             return $lockedRun->fresh('shifts');
         });

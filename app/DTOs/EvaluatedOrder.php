@@ -34,6 +34,8 @@ final readonly class EvaluatedOrder
         public array $reasonCodes = [],
         public string $futurePositionBonusMxn = '0.00',
         public float $batchPotential = 0.0,
+        public float $slackMin = 0.0,
+        public float $pickupEfficiency = 0.0,
     ) {
         if ($this->orderId === '') {
             throw new InvalidArgumentException('Evaluated order requires an id.');
@@ -68,10 +70,15 @@ final readonly class EvaluatedOrder
             'lateness risk' => $this->latenessRisk,
             'batch compatibility' => $this->batchCompatibility,
             'batch potential' => $this->batchPotential,
+            'pickup efficiency' => $this->pickupEfficiency,
         ] as $label => $number) {
             if (! is_finite($number) || $number < 0 || $number > 1) {
                 throw new InvalidArgumentException("{$label} must be between 0 and 1.");
             }
+        }
+
+        if (! is_finite($this->slackMin)) {
+            throw new InvalidArgumentException('Slack must be finite.');
         }
 
         if (! is_finite($this->score) || $this->score < 0 || $this->score > 100) {
@@ -126,6 +133,8 @@ final readonly class EvaluatedOrder
             reasonCodes: $reasons,
             futurePositionBonusMxn: (string) ($value['future_position_bonus_mxn'] ?? '0.00'),
             batchPotential: (float) ($value['batch_potential'] ?? 0),
+            slackMin: (float) ($value['slack_min'] ?? 0),
+            pickupEfficiency: (float) ($value['pickup_efficiency'] ?? 0),
         );
     }
 
@@ -153,6 +162,8 @@ final readonly class EvaluatedOrder
             'reason_codes' => array_map(static fn (ReasonCode $reason): string => $reason->value, $this->reasonCodes),
             'future_position_bonus_mxn' => $this->futurePositionBonusMxn,
             'batch_potential' => $this->batchPotential,
+            'slack_min' => $this->slackMin,
+            'pickup_efficiency' => $this->pickupEfficiency,
         ];
     }
 

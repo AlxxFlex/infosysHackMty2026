@@ -34,6 +34,10 @@ final readonly class OptimizedPlan
         public bool $routingFallback = false,
         public bool $budgetExceeded = false,
         public int $candidatesEvaluated = 0,
+        public float $batchSavingsDistanceKm = 0.0,
+        public float $detourRatio = 0.0,
+        public float $routeOverlap = 0.0,
+        public float $deadheadDistanceKm = 0.0,
     ) {
         foreach ($this->orderIds as $orderId) {
             if (! is_string($orderId) || $orderId === '') {
@@ -61,6 +65,12 @@ final readonly class OptimizedPlan
 
         if ($this->routeProvider === '' || $this->candidatesEvaluated < 0) {
             throw new InvalidArgumentException('Plan provider and candidate count are invalid.');
+        }
+
+        foreach (['batch savings distance' => $this->batchSavingsDistanceKm, 'detour ratio' => $this->detourRatio, 'route overlap' => $this->routeOverlap, 'deadhead distance' => $this->deadheadDistanceKm] as $label => $number) {
+            if (! is_finite($number) || $number < 0 || ($label === 'route overlap' && $number > 1)) {
+                throw new InvalidArgumentException("{$label} must be non-negative and route overlap must be between 0 and 1.");
+            }
         }
 
         foreach ([
@@ -113,6 +123,10 @@ final readonly class OptimizedPlan
             routingFallback: (bool) ($value['routing_fallback'] ?? false),
             budgetExceeded: (bool) ($value['budget_exceeded'] ?? false),
             candidatesEvaluated: (int) ($value['candidates_evaluated'] ?? 0),
+            batchSavingsDistanceKm: (float) ($value['batch_savings_distance_km'] ?? 0),
+            detourRatio: (float) ($value['detour_ratio'] ?? 0),
+            routeOverlap: (float) ($value['route_overlap'] ?? 0),
+            deadheadDistanceKm: (float) ($value['deadhead_distance_km'] ?? 0),
         );
     }
 
@@ -139,6 +153,10 @@ final readonly class OptimizedPlan
             'routing_fallback' => $this->routingFallback,
             'budget_exceeded' => $this->budgetExceeded,
             'candidates_evaluated' => $this->candidatesEvaluated,
+            'batch_savings_distance_km' => $this->batchSavingsDistanceKm,
+            'detour_ratio' => $this->detourRatio,
+            'route_overlap' => $this->routeOverlap,
+            'deadhead_distance_km' => $this->deadheadDistanceKm,
         ];
     }
 }
