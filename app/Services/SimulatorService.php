@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Enums\OrderStatus;
 use App\Enums\ShiftStatus;
+use App\Events\SimulationUpdated;
 use App\Exceptions\InvalidSimulationTick;
 use App\Models\Shift;
 use App\Models\SimulationRun;
@@ -15,6 +16,12 @@ use Illuminate\Support\Facades\DB;
 
 final class SimulatorService
 {
+    public function __construct(
+        private readonly ScenarioService $scenarioService,
+        private readonly PlanExecutionService $planExecutionService,
+        private readonly SimulationEventService $simulationEventService,
+    ) {}
+
     public function tick(
         SimulationRun|int $run,
         int $minutes,
@@ -55,6 +62,9 @@ final class SimulatorService
                 'simulated_current_at' => $target,
                 'real_last_tick_at' => now(),
             ])->save();
+            $this->scenarioService->advanceOffers($lockedRun, $target);
+            $this->simulationEventService->applyDue($lockedRun, $target);
+            $this->planExecutionService->advance($lockedRun, $target);
 
             if ($target->greaterThanOrEqualTo($end)) {
                 $lockedRun->forceFill([
@@ -62,6 +72,7 @@ final class SimulatorService
                     'real_finished_at' => now(),
                 ])->save();
                 $this->setShiftStatus($lockedRun, ShiftStatus::FINISHED);
+                DB::afterCommit(fn () => SimulationUpdated::dispatch($lockedRun->id, 'run.finished', $target->toIso8601String(), [(string) $lockedRun->id], ['status' => ShiftStatus::FINISHED->value]));
             }
 
             if ($idempotencyKey !== null) {
@@ -138,6 +149,9 @@ final class SimulatorService
                 'simulated_current_at' => $target,
                 'real_last_tick_at' => $newAnchor,
             ])->save();
+            $this->scenarioService->advanceOffers($lockedRun, $target);
+            $this->simulationEventService->applyDue($lockedRun, $target);
+            $this->planExecutionService->advance($lockedRun, $target);
 
             if ($target->greaterThanOrEqualTo($end)) {
                 $lockedRun->forceFill([
@@ -145,6 +159,7 @@ final class SimulatorService
                     'real_finished_at' => $observedAt,
                 ])->save();
                 $this->setShiftStatus($lockedRun, ShiftStatus::FINISHED);
+                DB::afterCommit(fn () => SimulationUpdated::dispatch($lockedRun->id, 'run.finished', $target->toIso8601String(), [(string) $lockedRun->id], ['status' => ShiftStatus::FINISHED->value]));
             }
 
             return $lockedRun->fresh('shifts');

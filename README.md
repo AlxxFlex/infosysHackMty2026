@@ -1,59 +1,121 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Courier AI
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Courier AI es una demo reproducible para el reto Infosys Track 3 de HackMTY 2026. Ayuda a un repartidor a decidir qué pedido (o batch de hasta dos) conviene aceptar, considerando ruta, tiempo, costo, riesgo y valor de la posición futura. La decisión la toman las métricas y la optimización; el LLM, si se activa, únicamente explica una decisión ya calculada.
 
-## About Laravel
+## Alcance y datos
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+El escenario `demo_normal` y sus seis pedidos, seeds, demanda, eventos de tráfico/surge/cierres y pagos son **datos sintéticos** para demostración. No representan a Uber, DiDi, Rappi ni a ningún proveedor real. OSRM es opcional: cuando no responde se usa una ruta geométrica determinista marcada como `fallback`. La explicación determinista y el polling funcionan sin servicios externos. No hay credenciales ni resultados de benchmark inventados en el repositorio.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Arquitectura
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+```text
+Blade + Livewire + Alpine.js + MapLibre
+                ↓
+Controllers / Form Requests / Livewire
+                ↓
+Application Services
+                ↓
+Eloquent Models + MySQL 8 + OSRM (opcional) + LLM (opcional)
+```
 
-## Learning Laravel
+`ShiftService` y `SimulatorService` controlan el reloj simulado; `RoutingService` normaliza OSRM/fallback; `ScoringService` calcula métricas; `OptimizationService` elige la utilidad absoluta; `BaselineService` elige el mayor pago bruto factible; `BenchmarkService` compara resultados realizados. Events notifican cambios y los Jobs encapsulan la explicación LLM. Las transiciones de tick, aceptación, eventos y reset son transaccionales e idempotentes.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+## Stack y requisitos
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+- PHP 8.2+, Composer 2, extensiones `pdo_mysql`, `mbstring`, `bcmath`, `json`.
+- Laravel 12, Livewire 3.6 y Blade; Node.js 20+ y npm.
+- MySQL 8.0+ (la suite usa una base separada llamada `infoSys_testing`).
+- MapLibre GL JS en el navegador. OSRM y Reverb son opcionales para la demo.
 
-## Laravel Sponsors
+## Instalación reproducible
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+```bash
+git clone <URL-del-repositorio>
+cd infosysHackMty2026
+composer install
+cp .env.example .env
+php artisan key:generate
+```
 
-### Premium Partners
+Crea dos bases MySQL (por ejemplo `courier_ai` y `infoSys_testing`) y configura `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME` y `DB_PASSWORD` en `.env`. Después ejecuta:
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+```bash
+php artisan migrate --seed
+npm install
+npm run build
+php artisan courier:check-config
+```
 
-## Contributing
+Usa `APP_DEBUG=false` en producción o al compartir la demo públicamente. No commitees `.env`, tokens, claves LLM ni credenciales; `.gitignore` ya excluye esos archivos y artefactos locales.
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## Ejecutar la aplicación
 
-## Code of Conduct
+Para el flujo mínimo sin servicios opcionales:
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+```bash
+php artisan serve
+```
 
-## Security Vulnerabilities
+Abre [`/courier`](http://localhost:8000/courier). El panel controlado está en [`/demo/control`](http://localhost:8000/demo/control); sólo está disponible en `local`/`testing` o con el header `X-Demo-Token` que corresponda a `DEMO_ACCESS_TOKEN`. En una instalación pública configura un token aleatorio.
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+Para procesamiento asíncrono y tiempo real, en terminales separadas ejecuta:
 
-## License
+```bash
+php artisan queue:work --tries=1 --timeout=60
+php artisan reverb:start
+```
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+El dashboard conserva polling cuando Reverb está apagado. Para apagar servicios opcionales usa `BROADCAST_CONNECTION=log`, `LLM_PROVIDER=none` y `ROUTING_PROVIDER=fallback`; también puedes dejar `OSRM_BASE_URL` configurado y permitir que el timeout active el fallback automáticamente.
+
+## Guion de demo (menos de tres minutos)
+
+1. Entra a `/demo/control`, pulsa **Iniciar escenario** y muestra las seis ofertas, la seed y la etiqueta de datos simulados.
+2. En `/courier`, observa ranking, batch recomendado, ruta y métricas en MXN, km y minutos; pulsa **Explicar decisión** (determinista si `LLM_PROVIDER=none`).
+3. Pulsa **Aceptar recomendación** y avanza uno o dos ticks.
+4. En el panel dispara surge, cierre de carretera o retraso de restaurante; avanza otro tick y muestra la reoptimización y los avisos de fallback si OSRM no está disponible.
+5. Termina el turno y abre la comparación Courier AI/baseline. Reinicia con confirmación antes de repetir la demo.
+
+El mapa es informativo y no bloquea el flujo si MapLibre o OSRM no cargan. Los controles tienen labels visibles, foco de teclado, estados de carga/error/vacío, contraste y respetan `prefers-reduced-motion` en las animaciones principales.
+
+## Cálculos y comparación
+
+Para cada pedido se calcula:
+
+```text
+tiempo = (ruta_pickup + ruta_entrega) × tráfico × clima + espera_restaurante
+costo_operativo = distancia_km × costo_por_km
+ganancia_neta = pago_base + surge + otros_bonos − costo_operativo
+tasa_horaria = ganancia_neta / tiempo × 60
+```
+
+El score normalizado combina tasa horaria, ganancia neta, destino, batch, pickup y confiabilidad con pesos configurables que suman 1.0. La optimización evalúa singles y batches factibles dentro de `max_candidates` y `time_budget_ms`, maximizando utilidad absoluta (ganancia, bonus de batch y posición futura menos demora, riesgo y ocio). El baseline comparte exactamente escenario, pedidos, seed y reloj, pero elige sólo el mayor pago bruto factible. Un denominador baseline cero se muestra como `N/D`, nunca como un porcentaje falso.
+
+## API, tests y benchmark
+
+La API versionada está bajo `/api/v1` y limita tráfico a 120 solicitudes por minuto. Los endpoints de tick y aceptación exigen `Idempotency-Key`; los Form Requests limitan minutos, pedidos, candidatos y payloads esperados.
+
+```bash
+php artisan test
+vendor/bin/pint --test
+npm run build
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+php artisan optimize:clear
+```
+
+Para un benchmark reproducible (todos los valores quedan marcados como simulados) ejecuta:
+
+```bash
+php artisan benchmark:run demo_normal --seeds=1,2,3
+```
+
+El comando imprime JSON con seeds, versión de algoritmo, métricas realizadas, fallos y comparaciones. **No se publica aquí un porcentaje de mejora**: vuelve a ejecutar el benchmark con la configuración final y conserva su salida real antes de comunicar cualquier cifra.
+
+## Limitaciones y siguientes pasos
+
+El escenario no es telemetría productiva, el routing fallback no modela calles reales, no existe autenticación de repartidores y Reverb/LLM dependen de la infraestructura que los hospede. Para producción se necesitarían datos reales consentidos, observabilidad y alertas, autenticación/autorización completa, colas durables, límites por usuario y validación operativa de rutas.
+
+## Licencia
+
+Código de demostración para HackMTY 2026; conservar las licencias de Laravel, Livewire, MapLibre y demás dependencias indicadas por Composer/npm.
